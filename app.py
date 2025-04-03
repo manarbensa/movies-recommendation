@@ -7,7 +7,7 @@ st.set_page_config(page_title="Movie Recommender System", layout="wide")
 # Load data
 title_list = pd.read_csv('user_ratings_genres_mov.csv')
 movie_titles = title_list['title'].unique()
-movie_genres = title_list['genres'].unique()
+movie_genres = title_list['genres'].str.replace('|', ', ').unique()
 
 # Function to inject custom CSS for modern design
 def inject_custom_css():
