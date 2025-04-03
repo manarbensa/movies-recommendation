@@ -7,6 +7,7 @@ st.set_page_config(page_title="Movie Recommender System", layout="wide")
 # Load data
 title_list = pd.read_csv('user_ratings_genres_mov.csv')
 movie_titles = title_list['title'].unique()
+movie_genres = title_list['genres'].unique()
 
 # Function to inject custom CSS for modern design
 def inject_custom_css():
@@ -94,23 +95,28 @@ def main():
                             'Collaborative Filtering - Model-Based (KNN)'))
         
         # Favorite movies input
-        st.markdown("### 🎥 Sélectionnez vos 3 films préférés et évaluez-les")
-        movie_1 = st.selectbox('Premier film', movie_titles)
+        st.markdown("### 🎥 Sélectionnez vos 3 films préférés, évaluez-les et ajoutez leurs genres")
+        
+        # Movie 1
+        movie_1 = st.selectbox('Premier film', movie_titles, key='movie_1')
         rating_1 = st.slider(f"Évaluez {movie_1} (1-5)", 1, 5, 3, key=f"rating_1_{movie_1}")
-
-    # Film 2
-        movie_2 = st.selectbox('Deuxième film', movie_titles)
+        genre_1 = st.selectbox(f'Genre de {movie_1}', movie_genres, key=f'genre_1_{movie_1}')
+        
+        # Movie 2
+        movie_2 = st.selectbox('Deuxième film', movie_titles, key='movie_2')
         rating_2 = st.slider(f"Évaluez {movie_2} (1-5)", 1, 5, 3, key=f"rating_2_{movie_2}")
-
-    # Film 3
-        movie_3 = st.selectbox('Troisième film', movie_titles)
+        genre_2 = st.selectbox(f'Genre de {movie_2}', movie_genres, key=f'genre_2_{movie_2}')
+        
+        # Movie 3
+        movie_3 = st.selectbox('Troisième film', movie_titles, key='movie_3')
         rating_3 = st.slider(f"Évaluez {movie_3} (1-5)", 1, 5, 3, key=f"rating_3_{movie_3}")
+        genre_3 = st.selectbox(f'Genre de {movie_3}', movie_genres, key=f'genre_3_{movie_3}')
 
-    # Afficher les films sélectionnés et leurs notes
-        st.markdown("### Vos films sélectionnés et vos évaluations")
-        st.write(f"{movie_1} : {rating_1} ⭐")
-        st.write(f"{movie_2} : {rating_2} ⭐")
-        st.write(f"{movie_3} : {rating_3} ⭐")
+        # Display the selected movies, ratings, and genres
+        st.markdown("### Vos films sélectionnés, vos évaluations et leurs genres")
+        st.write(f"{movie_1} : {rating_1} ⭐ | Genre: {genre_1}")
+        st.write(f"{movie_2} : {rating_2} ⭐ | Genre: {genre_2}")
+        st.write(f"{movie_3} : {rating_3} ⭐ | Genre: {genre_3}")
 
         #--------------------partie de felicien------------------------------------------------
         #---------------------------------------------------
@@ -127,8 +133,7 @@ def main():
                         st.subheader(str(i+1)+'. '+j)
                 except:
                     st.error("Oops! Looks like this algorithm does't work.\
-                              We'll need to fix it!")
-                              '''
+                              We'll need to fix it!")'''
 #----------------------------------------------------------------------------------
 
         '''if sys == 'Collaborative Based Filtering':
