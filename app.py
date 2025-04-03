@@ -130,7 +130,7 @@ def main():
                     st.error("Oops! Looks like this algorithm does't work.\
                               We'll need to fix it!")
                               '''
-
+#----------------------------------------------------------------------------------
 
         '''if sys == 'Collaborative Based Filtering':
             if st.button("Recommend"):
