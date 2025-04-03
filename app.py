@@ -83,7 +83,6 @@ def main():
     # Page: Recommender System
     if page_selection == "Recommender System":
         st.title("🎬 Movie Recommender Engine")
-        st.subheader("EXPLORE Data Science Academy Unsupervised Predict")
         
         # Algorithm selection
         st.markdown("### 💡 Choose a Recommendation Algorithm")
