@@ -207,16 +207,42 @@ def recommend_knn(new_user_id, user_movie_matrix, top_n=5, n_neighbors=5):
 def recommend_content(best_film, movies_df, top_n=5):
     """
     Recommande des films similaires au film 'best_film' en se basant sur la similarité des genres.
+    Cette version élimine les doublons pour éviter de recommander le même film plusieurs fois.
     """
+    # Créer un DataFrame avec des films uniques (en se basant sur le titre)
+    unique_movies_df = movies_df.drop_duplicates(subset='title').reset_index(drop=True)
+    
+    # Transformation des genres en représentation TF-IDF
     vectorizer = TfidfVectorizer(token_pattern=r"(?u)\b\w+\b")
-    tfidf_matrix = vectorizer.fit_transform(movies_df['genres'])
+    tfidf_matrix = vectorizer.fit_transform(unique_movies_df['genres'])
+    
+    # Calcul de la similarité cosine entre tous les films
     cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
-    idx = movies_df[movies_df['title'] == best_film].index[0]
+    
+    # Récupération de l'index du film 'best_film'
+    idx_list = unique_movies_df[unique_movies_df['title'].str.lower() == best_film.lower()].index
+    if len(idx_list) == 0:
+        return []  # Si le film n'est pas trouvé, retourner une liste vide
+    idx = idx_list[0]
+    
+    # Calcul des scores de similarité pour le film choisi
     sim_scores = list(enumerate(cosine_sim[idx]))
+    
+    # Tri des films par ordre décroissant de similarité
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:top_n+1]
-    recommendations = [(movies_df.iloc[i]['title'], score) for i, score in sim_scores]
+    
+    # Parcourir les scores, exclure le film lui-même et collecter les top_n recommandations uniques
+    recommendations = []
+    for i, score in sim_scores:
+        # Exclure le film lui-même
+        if unique_movies_df.iloc[i]['title'].lower() == best_film.lower():
+            continue
+        recommendations.append((unique_movies_df.iloc[i]['title'], score))
+        if len(recommendations) == top_n:
+            break
+    
     return recommendations
+
 
 # --- Interface Streamlit ---
 def main():
