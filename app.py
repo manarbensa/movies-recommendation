@@ -53,22 +53,7 @@ def recommend_item_user(new_user_id, user_movie_matrix, top_n=5):
     return top_movies
 
 def recommend_user_item(new_user_id, user_movie_matrix, top_n=5):
-    """
-    Approche User-Item : prédit une note pour chaque film non noté par le nouvel utilisateur
-    en utilisant une moyenne pondérée basée sur la similarité entre utilisateurs.
-    
-    Améliorations :
-      - Utilisation d'une petite valeur epsilon pour éviter la division par zéro.
-      - Utilisation de DataFrame.at pour un accès explicite et rapide aux valeurs.
-    
-    Paramètres:
-      - new_user_id : l'identifiant du nouvel utilisateur.
-      - user_movie_matrix : DataFrame où les lignes représentent les utilisateurs et les colonnes les films.
-      - top_n : nombre de films à recommander (par défaut 5).
-      
-    Retourne:
-      - Une liste de tuples (titre du film, note prédite) triée par ordre décroissant de note prédite.
-    """
+ 
     epsilon = 1e-8  # Pour éviter la division par zéro
     
     # Calcul de la similarité entre utilisateurs
@@ -102,22 +87,7 @@ def recommend_user_item(new_user_id, user_movie_matrix, top_n=5):
 
 # --- Recommandations collaboratives basées sur un modèle ---
 def recommend_nmf(new_user_id, user_movie_matrix, top_n=5):
-    """
-    Utilise NMF pour factoriser la matrice de notes et reconstruire les notes.
-    Recommande les films non notés par le nouvel utilisateur en utilisant la reconstruction.
-    
-    Améliorations :
-      - Utilisation de l'initialisation 'nndsvda' pour une meilleure convergence.
-      - Augmentation du nombre d'itérations (max_iter) pour assurer la convergence.
-    
-    Paramètres:
-      - new_user_id : l'identifiant du nouvel utilisateur.
-      - user_movie_matrix : DataFrame des notes avec utilisateurs en lignes et films en colonnes.
-      - top_n : nombre de films à recommander (par défaut 5).
-      
-    Retourne:
-      - Une liste de tuples (titre du film, note prédite) triée par ordre décroissant.
-    """
+  
     nmf_model = NMF(n_components=20, init='nndsvda', max_iter=500, random_state=42)
     W = nmf_model.fit_transform(user_movie_matrix)
     H = nmf_model.components_
@@ -135,21 +105,7 @@ def recommend_nmf(new_user_id, user_movie_matrix, top_n=5):
 
 
 def recommend_svd(new_user_id, user_movie_matrix, top_n=5):
-    """
-    Utilise SVD (TruncatedSVD) pour reconstruire la matrice de notes et recommande les films non notés par le nouvel utilisateur.
-    
-    Améliorations :
-      - Centrage des notes en soustrayant la note moyenne de chaque utilisateur avant la factorisation.
-      - Ajout de la moyenne après la reconstruction pour obtenir les notes prédites.
-    
-    Paramètres:
-      - new_user_id : l'identifiant du nouvel utilisateur.
-      - user_movie_matrix : DataFrame des notes où chaque ligne correspond à un utilisateur et chaque colonne à un film.
-      - top_n : nombre de films à recommander (par défaut 5).
-      
-    Retourne:
-      - Une liste de tuples (titre du film, note prédite) triée par ordre décroissant de pertinence.
-    """
+  
     # Calculer la note moyenne de chaque utilisateur (en ignorant les zéros)
     user_means = user_movie_matrix.replace(0, np.nan).mean(axis=1).fillna(0)
     
@@ -181,19 +137,7 @@ def recommend_svd(new_user_id, user_movie_matrix, top_n=5):
 
 
 def recommend_knn(new_user_id, user_movie_matrix, top_n=5, n_neighbors=5):
-    """
-    Utilise KNN pour recommander les films non notés par le nouvel utilisateur en s'appuyant sur les voisins les plus proches,
-    avec une pondération des notes par l'inverse de la distance.
-    
-    Paramètres:
-      - new_user_id: l'identifiant du nouvel utilisateur.
-      - user_movie_matrix: DataFrame où les lignes représentent les utilisateurs et les colonnes les films.
-      - top_n: nombre de recommandations à retourner.
-      - n_neighbors: nombre de voisins à considérer (excluant l'utilisateur lui-même).
-      
-    Retourne:
-      - Une liste de tuples (titre du film, note prédite) triée par ordre décroissant de pertinence.
-    """
+   
     from sklearn.neighbors import NearestNeighbors
     
     # Initialisation et entraînement du modèle KNN
@@ -230,8 +174,8 @@ def recommend_knn(new_user_id, user_movie_matrix, top_n=5, n_neighbors=5):
     return top_movies
 
 # --- Recommandation basée sur le contenu ---
-def recommend_content(best_film, movies_df, top_n=5):
-       # Transformation des genres en représentation TF-IDF
+def recommend_content(best_film, movies_df, user_preferences=None, top_n=5):
+    # Transformation des genres en représentation TF-IDF
     vectorizer = TfidfVectorizer(token_pattern=r"(?u)\b\w+\b")
     tfidf_matrix = vectorizer.fit_transform(movies_df['genres'])
     
@@ -243,6 +187,22 @@ def recommend_content(best_film, movies_df, top_n=5):
     
     # Calcul des scores de similarité pour le film choisi
     sim_scores = list(enumerate(cosine_sim[idx]))
+    
+    # Si des préférences de genre sont fournies, pondérer les scores
+    if user_preferences is not None and not user_preferences.empty:
+        # Extraire tous les genres préférés de l'utilisateur
+        preferred_genres = set()
+        for genres in user_preferences['genres']:
+            if genres:  # Vérifier que genres n'est pas vide
+                preferred_genres.update(genres.split('|'))
+        
+        # Créer un multiplicateur basé sur les genres préférés
+        for i, (movie_idx, score) in enumerate(sim_scores):
+            movie_genres = set(movies_df.iloc[movie_idx]['genres'].split('|'))
+            # Augmenter le score si le film a des genres préférés
+            common_genres = preferred_genres.intersection(movie_genres)
+            if common_genres:
+                sim_scores[i] = (movie_idx, score * (1 + 0.5 * len(common_genres)))
     
     # Tri des films par ordre décroissant de similarité
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
@@ -259,15 +219,49 @@ def main():
     inject_custom_css()
     
     st.sidebar.image("movie-critic.webp", use_container_width=True)
-    page_options = ["Recommender System", "Solution Overview", "Project Documentation", "About"]
-    page_selection = st.sidebar.selectbox("Choose Option", page_options)
     
-    if page_selection == "Recommender System":
-        st.title("🎬 Movie Recommender Engine")
+    # Internationalisation
+    language = st.sidebar.radio("Language", ["Français", "English"])
+    
+    if language == "Français":
+        page_options = ["Système de Recommandation", "Aperçu de la Solution", "Documentation", "À propos"]
+        page_titles = {
+            "Système de Recommandation": "🎬 Système de Recommandation de Films",
+            "Aperçu de la Solution": "📊 Aperçu de la Solution",
+            "Documentation": "📚 Documentation du Projet", 
+            "À propos": "ℹ À propos"
+        }
+    else:
+        page_options = ["Recommender System", "Solution Overview", "Project Documentation", "About"] 
+        page_titles = {
+            "Recommender System": "🎬 Movie Recommender Engine",
+            "Solution Overview": "📊 Solution Overview",
+            "Project Documentation": "📚 Project Documentation",
+            "About": "ℹ About"
+        }
+        
+    page_selection = st.sidebar.selectbox("Menu", page_options)
+    st.title(page_titles[page_selection])
+    
+    if page_selection in ["Recommender System", "Système de Recommandation"]:
         
         # Sélection de l'algorithme
-        st.markdown("### 💡 Choisissez un algorithme de recommandation")
-        algo = st.selectbox("Algorithm:", (
+        if language == "Français":
+            st.markdown("### 💡 Choisissez un algorithme de recommandation")
+            algo = st.selectbox("Algorithme:", (
+                'Filtrage Collaboratif - Mémoire (Item-User)',
+                'Filtrage Collaboratif - Mémoire (User-Item)', 
+                'Filtrage Collaboratif - Modèle (NMF)',
+                'Filtrage Collaboratif - Modèle (SVD)',
+                'Filtrage Collaboratif - Modèle (KNN)',
+                'Filtrage Basé sur le Contenu'
+            ))
+            film_text = "film"
+            note_text = "Évaluez"
+            recommandations_text = "🔥 Films recommandés"
+        else:
+            st.markdown("### 💡 Choose a recommendation algorithm") 
+            algo = st.selectbox("Algorithm:", (
             'Collaborative Filtering - Memory-Based (Item-User)',
             'Collaborative Filtering - Memory-Based (User-Item)',
             'Collaborative Filtering - Model-Based (NMF)',
@@ -277,28 +271,53 @@ def main():
         ))
         
         st.markdown("### 🎥 Sélectionnez vos 3 films préférés et évaluez-les")
-        # Saisie des 3 films et leurs notes
+        # Saisie des 3 films, leurs notes et genres préférés
         movie_1 = st.selectbox('Premier film', movie_titles, key='movie_1')
         rating_1 = st.slider(f"Évaluez {movie_1} (1-5)", 1, 5, 3, key=f"rating_1_{movie_1}")
+        genres_1 = st.multiselect(
+            f"Genres préférés pour {movie_1}",
+            options=["Action", "Adventure", "Animation", "Children", "Comedy", 
+                    "Crime", "Documentary", "Drama", "Fantasy", "Film-Noir",
+                    "Horror", "Musical", "Mystery", "Romance", "Sci-Fi",
+                    "Thriller", "War", "Western"],
+            key=f"genres_1_{movie_1}"
+        )
         
         movie_2 = st.selectbox('Deuxième film', movie_titles, key='movie_2')
         rating_2 = st.slider(f"Évaluez {movie_2} (1-5)", 1, 5, 3, key=f"rating_2_{movie_2}")
+        genres_2 = st.multiselect(
+            f"Genres préférés pour {movie_2}",
+            options=["Action", "Adventure", "Animation", "Children", "Comedy", 
+                    "Crime", "Documentary", "Drama", "Fantasy", "Film-Noir",
+                    "Horror", "Musical", "Mystery", "Romance", "Sci-Fi",
+                    "Thriller", "War", "Western"],
+            key=f"genres_2_{movie_2}"
+        )
         
         movie_3 = st.selectbox('Troisième film', movie_titles, key='movie_3')
         rating_3 = st.slider(f"Évaluez {movie_3} (1-5)", 1, 5, 3, key=f"rating_3_{movie_3}")
+        genres_3 = st.multiselect(
+            f"Genres préférés pour {movie_3}",
+            options=["Action", "Adventure", "Animation", "Children", "Comedy", 
+                    "Crime", "Documentary", "Drama", "Fantasy", "Film-Noir",
+                    "Horror", "Musical", "Mystery", "Romance", "Sci-Fi",
+                    "Thriller", "War", "Western"],
+            key=f"genres_3_{movie_3}"
+        )
         
         # Affichage des préférences de l'utilisateur
-        st.markdown("### Vos films sélectionnés et vos évaluations")
-        st.write(f"{movie_1} : {rating_1} ⭐")
-        st.write(f"{movie_2} : {rating_2} ⭐")
-        st.write(f"{movie_3} : {rating_3} ⭐")
+        st.markdown("### Vos films sélectionnés, évaluations et genres préférés")
+        st.write(f"{movie_1} : {rating_1} ⭐ - Genres: {', '.join(genres_1) if genres_1 else 'Aucun'}")
+        st.write(f"{movie_2} : {rating_2} ⭐ - Genres: {', '.join(genres_2) if genres_2 else 'Aucun'}")
+        st.write(f"{movie_3} : {rating_3} ⭐ - Genres: {', '.join(genres_3) if genres_3 else 'Aucun'}")
         
         # --- Intégration temporaire dans le dataset ---
         # On attribue un nouvel identifiant utilisateur (par exemple 9999)
+        # Création du dataframe avec les préférences utilisateur incluant les genres
         user_preferences = pd.DataFrame([
-            {"userId": 9999, "title": movie_1, "rating": rating_1},
-            {"userId": 9999, "title": movie_2, "rating": rating_2},
-            {"userId": 9999, "title": movie_3, "rating": rating_3},
+            {"userId": 9999, "title": movie_1, "rating": rating_1, "genres": "|".join(genres_1)},
+            {"userId": 9999, "title": movie_2, "rating": rating_2, "genres": "|".join(genres_2)},
+            {"userId": 9999, "title": movie_3, "rating": rating_3, "genres": "|".join(genres_3)},
         ])
         df_original = title_list.copy()
         df_temp = pd.concat([df_original, user_preferences], ignore_index=True)
@@ -345,7 +364,13 @@ def main():
                 user_films = {movie_1: rating_1, movie_2: rating_2, movie_3: rating_3}
                 best_film = max(user_films, key=user_films.get)
                 st.markdown(f"#### Film le mieux évalué: {best_film}")
-                recs = recommend_content(best_film, title_list, top_n=5)
+                # Récupérer les préférences de genre de l'utilisateur
+                user_prefs = pd.DataFrame([
+                    {"genres": "|".join(genres_1)},
+                    {"genres": "|".join(genres_2)},
+                    {"genres": "|".join(genres_3)},
+                ])
+                recs = recommend_content(best_film, title_list, user_preferences=user_prefs, top_n=5)
                 st.markdown("#### Recommandations Content-Based:")
                 for movie, score in recs:
                     st.write(f"{movie} - Similarité: {score:.2f}")
@@ -353,14 +378,14 @@ def main():
     elif page_selection == "Solution Overview":
         st.title("📊 Solution Overview")
         st.markdown("""
-        **Project Goal:**  
+        *Project Goal:*  
         Build a robust movie recommendation system using both collaborative and content-based approaches.
         
-        **Techniques Implemented:**
+        *Techniques Implemented:*
         - Content-Based Filtering
         - Collaborative Filtering (Memory-Based and Model-Based: NMF, SVD, KNN)
         
-        **Technologies Used:**
+        *Technologies Used:*
         - Python, Pandas, Numpy
         - Streamlit for the GUI
         - Machine Learning libraries such as Scikit-learn and Surprise
@@ -369,30 +394,29 @@ def main():
     elif page_selection == "Project Documentation":
         st.title("📚 Project Documentation")
         st.markdown("""
-        **Project Goal:**  
+        *Project Goal:*  
         Develop a robust movie recommendation system.
         
-        **Techniques:**  
+        *Techniques:*  
         - Content-Based Filtering  
         - Collaborative Filtering (Memory-Based and Model-Based)
         
-        **Algorithms:**  
+        *Algorithms:*  
         - Memory-based filtering  
         - Model-based filtering: NMF, SVD, KNN
         
-        **Technologies:**  
+        *Technologies:*  
         - Python, Pandas, Numpy  
         - Streamlit, Scikit-learn, Surprise
         
-        **Deployment:**  
+        *Deployment:*  
         Streamlit web application.
         """)
     
     elif page_selection == "About":
-        st.title("ℹ️ About")
-        st.markdown("Developed as part of a data science project for EXPLORE Data Science Academy.")
-        st.markdown("Created by: Your Name")
+        st.title("ℹ About")
+        st.markdown("Developed with ❤ by [Bensaada Manar](https://github.com/bensaadam) and [Aponi Felicien](https://github.com/felicienaponi).")
         st.markdown("Year: 2025")
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     main()
